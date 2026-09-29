@@ -1,0 +1,278 @@
+import React, { useState } from 'react';
+import Web3 from 'web3';
+
+const CONTRACT_ABI: any = [
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "uint256", "name": "productId", "type": "uint256" },
+      { "indexed": false, "internalType": "string", "name": "name", "type": "string" },
+      { "indexed": false, "internalType": "string", "name": "manufacturer", "type": "string" },
+      { "indexed": false, "internalType": "address", "name": "owner", "type": "address" }
+    ],
+    "name": "ProductCreated",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "_productId", "type": "uint256" },
+      { "internalType": "string", "name": "_name", "type": "string" },
+      { "internalType": "string", "name": "_manufacturer", "type": "string" }
+    ],
+    "name": "createProduct",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "_productId", "type": "uint256" },
+      { "internalType": "uint8", "name": "_state", "type": "uint8" }
+    ],
+    "name": "updateProductState",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "_productId", "type": "uint256" }],
+    "name": "getProduct",
+    "outputs": [
+      { "internalType": "uint256", "name": "productId", "type": "uint256" },
+      { "internalType": "string", "name": "name", "type": "string" },
+      { "internalType": "string", "name": "manufacturer", "type": "string" },
+      { "internalType": "uint256", "name": "timestamp", "type": "uint256" },
+      { "internalType": "address", "name": "currentOwner", "type": "address" },
+      { "internalType": "uint8", "name": "state", "type": "uint8" },
+      { "internalType": "bool", "name": "exists", "type": "bool" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+];
+
+// NOTE: Replace this string with your Truffle deployed contract address
+const CONTRACT_ADDRESS = "0xYOUR_DEPLOYED_CONTRACT_ADDRESS_HERE";
+
+export default function App() {
+  const [account, setAccount] = useState<string>('');
+
+  // Form State - Register
+  const [pId, setPId] = useState('');
+  const [pName, setPName] = useState('');
+  const [pManufacturer, setPManufacturer] = useState('');
+
+  // Form State - Track
+  const [searchId, setSearchId] = useState('');
+  const [productDetails, setProductDetails] = useState<any>(null);
+  const [notFound, setNotFound] = useState(false);
+
+  // Form State - Update
+  const [updateId, setUpdateId] = useState('');
+  const [updateState, setUpdateState] = useState('1');
+
+  const [loading, setLoading] = useState(false);
+
+  const stateNames = ["Created", "In Transit", "Delivered"];
+  const badgeClasses = ["badge-created", "badge-transit", "badge-delivered"];
+
+  const connectWallet = async () => {
+    if ((window as any).ethereum) {
+      try {
+        const web3 = new Web3((window as any).ethereum);
+        await (window as any).ethereum.request({ method: 'eth_requestAccounts' });
+        const accounts = await web3.eth.getAccounts();
+        setAccount(accounts[0]);
+      } catch (err: any) {
+        alert('Wallet connection failed!');
+      }
+    } else {
+      alert('Please install MetaMask extension in your browser!');
+    }
+  };
+
+  const registerProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!account) return alert('Please connect your MetaMask wallet first!');
+    if (CONTRACT_ADDRESS === "0xYOUR_DEPLOYED_CONTRACT_ADDRESS_HERE") {
+      return alert('Please update CONTRACT_ADDRESS in App.tsx with your Truffle deployed contract address!');
+    }
+
+    setLoading(true);
+    try {
+      const web3 = new Web3((window as any).ethereum);
+      const contract = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
+      await contract.methods.createProduct(pId, pName, pManufacturer).send({ from: account });
+      alert('Product registered successfully on Blockchain!');
+      setPId(''); setPName(''); setPManufacturer('');
+    } catch (err: any) {
+      alert('Transaction Failed: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const trackProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (CONTRACT_ADDRESS === "0xYOUR_DEPLOYED_CONTRACT_ADDRESS_HERE") {
+      return alert('Please update CONTRACT_ADDRESS in App.tsx with your Truffle deployed contract address!');
+    }
+
+    setLoading(true);
+    try {
+      const web3 = new Web3("http://127.0.0.1:7545");
+      const contract = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
+      const res: any = await contract.methods.getProduct(searchId).call();
+      
+      if (res.exists) {
+        setProductDetails(res);
+        setNotFound(false);
+      } else {
+        setProductDetails(null);
+        setNotFound(true);
+      }
+    } catch (err) {
+      setProductDetails(null);
+      setNotFound(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateStatus = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!account) return alert('Please connect your MetaMask wallet first!');
+    if (CONTRACT_ADDRESS === "0xYOUR_DEPLOYED_CONTRACT_ADDRESS_HERE") {
+      return alert('Please update CONTRACT_ADDRESS in App.tsx with your Truffle deployed contract address!');
+    }
+
+    setLoading(true);
+    try {
+      const web3 = new Web3((window as any).ethereum);
+      const contract = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
+      await contract.methods.updateProductState(updateId, updateState).send({ from: account });
+      alert('Product status updated successfully!');
+      setUpdateId('');
+    } catch (err: any) {
+      alert('Update Failed: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="container">
+      {/* Header */}
+      <header className="header">
+        <div className="brand">
+          <span className="brand-icon">📦</span>
+          <h1 className="title">SupplyChain Provenance DApp</h1>
+        </div>
+        <button onClick={connectWallet} className="btn-wallet">
+          {account ? `${account.substring(0, 6)}...${account.substring(38)}` : 'Connect Wallet'}
+        </button>
+      </header>
+
+      {/* Main Grid Layout */}
+      <div className="grid">
+        {/* Card 1: Register Product */}
+        <div className="card">
+          <h2 className="card-title">📝 Register Product</h2>
+          <form onSubmit={registerProduct}>
+            <div className="form-group">
+              <label>Product ID</label>
+              <input type="number" placeholder="e.g. 101" value={pId} onChange={e => setPId(e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label>Product Name</label>
+              <input type="text" placeholder="e.g. iPhone 15 Pro" value={pName} onChange={e => setPName(e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label>Manufacturer</label>
+              <input type="text" placeholder="e.g. Apple Inc." value={pManufacturer} onChange={e => setPManufacturer(e.target.value)} required />
+            </div>
+            <button type="submit" className="btn-primary" disabled={loading}>
+              {loading ? 'Processing...' : 'Register On Blockchain'}
+            </button>
+          </form>
+        </div>
+
+        {/* Card 2: Track Provenance */}
+        <div className="card">
+          <h2 className="card-title">🔍 Track Product</h2>
+          <form onSubmit={trackProduct}>
+            <div className="form-group">
+              <label>Enter Product ID</label>
+              <input type="number" placeholder="Enter Product ID to verify" value={searchId} onChange={e => setSearchId(e.target.value)} required />
+            </div>
+            <button type="submit" className="btn-secondary" disabled={loading}>
+              {loading ? 'Searching...' : 'Verify Authenticity'}
+            </button>
+          </form>
+
+          {productDetails && (
+            <div className="result-box result-success">
+              <div className="result-header" style={{ color: '#10b981' }}>
+                ✅ Authenticity Verified
+              </div>
+              <div className="result-row">
+                <span className="result-label">ID</span>
+                <span className="result-value">#{productDetails.productId.toString()}</span>
+              </div>
+              <div className="result-row">
+                <span className="result-label">Name</span>
+                <span className="result-value">{productDetails.name}</span>
+              </div>
+              <div className="result-row">
+                <span className="result-label">Manufacturer</span>
+                <span className="result-value">{productDetails.manufacturer}</span>
+              </div>
+              <div className="result-row">
+                <span className="result-label">Status</span>
+                <span className={`badge ${badgeClasses[Number(productDetails.state)]}`}>
+                  {stateNames[Number(productDetails.state)]}
+                </span>
+              </div>
+              <div className="result-row">
+                <span className="result-label">Current Owner</span>
+                <span className="result-value">{`${productDetails.currentOwner.substring(0, 8)}...`}</span>
+              </div>
+            </div>
+          )}
+
+          {notFound && (
+            <div className="result-box result-error">
+              <div className="result-header" style={{ color: '#ef4444' }}>
+                ❌ Product Not Found
+              </div>
+              <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                No blockchain record exists for ID #{searchId}. This item might be counterfeit.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Card 3: Update Product Status */}
+        <div className="card">
+          <h2 className="card-title">🔄 Update Status</h2>
+          <form onSubmit={handleUpdateStatus}>
+            <div className="form-group">
+              <label>Product ID</label>
+              <input type="number" placeholder="e.g. 101" value={updateId} onChange={e => setUpdateId(e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label>Select New State</label>
+              <select value={updateState} onChange={e => setUpdateState(e.target.value)}>
+                <option value="1">In Transit</option>
+                <option value="2">Delivered</option>
+              </select>
+            </div>
+            <button type="submit" className="btn-primary" disabled={loading}>
+              {loading ? 'Updating...' : 'Update Blockchain Record'}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
